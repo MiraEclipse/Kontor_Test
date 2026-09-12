@@ -1,0 +1,14 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <TargetFramework>net8.0-windows</TargetFramework>
+    <UseWindowsForms>true</UseWindowsForms>
+    <ApplicationHighDpiMode>DpiUnaware</ApplicationHighDpiMode>
+    <RootNamespace>Kontor.App</RootNamespace>
+    <AssemblyName>Kontor</AssemblyName>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\Kontor.Core\Kontor.Core.csproj" />
+    <ProjectReference Include="..\Kontor.Data\Kontor.Data.csproj" />
+  </ItemGroup>
+</Project>

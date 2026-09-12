@@ -1,0 +1,11 @@
+C:\Users\Jamjam\Kontor\src\Kontor.Core\bin\Debug\net8.0\Kontor.Core.deps.json
+C:\Users\Jamjam\Kontor\src\Kontor.Core\bin\Debug\net8.0\Kontor.Core.dll
+C:\Users\Jamjam\Kontor\src\Kontor.Core\bin\Debug\net8.0\Kontor.Core.pdb
+C:\Users\Jamjam\Kontor\src\Kontor.Core\obj\Debug\net8.0\Kontor.Core.GeneratedMSBuildEditorConfig.editorconfig
+C:\Users\Jamjam\Kontor\src\Kontor.Core\obj\Debug\net8.0\Kontor.Core.AssemblyInfoInputs.cache
+C:\Users\Jamjam\Kontor\src\Kontor.Core\obj\Debug\net8.0\Kontor.Core.AssemblyInfo.cs
+C:\Users\Jamjam\Kontor\src\Kontor.Core\obj\Debug\net8.0\Kontor.Core.csproj.CoreCompileInputs.cache
+C:\Users\Jamjam\Kontor\src\Kontor.Core\obj\Debug\net8.0\Kontor.Core.dll
+C:\Users\Jamjam\Kontor\src\Kontor.Core\obj\Debug\net8.0\refint\Kontor.Core.dll
+C:\Users\Jamjam\Kontor\src\Kontor.Core\obj\Debug\net8.0\Kontor.Core.pdb
+C:\Users\Jamjam\Kontor\src\Kontor.Core\obj\Debug\net8.0\ref\Kontor.Core.dll
