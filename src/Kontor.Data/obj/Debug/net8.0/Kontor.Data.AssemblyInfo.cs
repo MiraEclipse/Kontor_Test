@@ -13,7 +13,7 @@ using System.Reflection;
 [assembly: System.Reflection.AssemblyCompanyAttribute("Kontor.Data")]
 [assembly: System.Reflection.AssemblyConfigurationAttribute("Debug")]
 [assembly: System.Reflection.AssemblyFileVersionAttribute("1.0.0.0")]
-[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0")]
+[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+dbf2b44995b66a8170bd17ce7051f821d8e0f065")]
 [assembly: System.Reflection.AssemblyProductAttribute("Kontor.Data")]
 [assembly: System.Reflection.AssemblyTitleAttribute("Kontor.Data")]
 [assembly: System.Reflection.AssemblyVersionAttribute("1.0.0.0")]
