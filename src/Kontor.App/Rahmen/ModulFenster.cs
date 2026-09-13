@@ -14,6 +14,12 @@ public class ModulFenster : Form
         ClientSize = new Size(560, 340);
         StartPosition = FormStartPosition.Manual;
         Text = Titel(MaskenModus.Anzeigen);
+
+        // Kein frei schwebendes MDI-Kindfenster mehr mit eigener Titelleiste - das Hauptfenster zeigt
+        // jeweils ein maximiertes Modul und legt darüber eine eigene Reiterleiste (Modulreiter), die
+        // dessen Aufgabe (Titel, Schließen-Kreuz) übernimmt.
+        FormBorderStyle = FormBorderStyle.None;
+        ControlBox = false;
     }
 
     public string Transaktionscode { get; }

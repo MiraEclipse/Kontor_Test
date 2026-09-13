@@ -19,6 +19,7 @@ public sealed class Hauptfenster : Form, IMeldungsanzeige
     private readonly ToolStripStatusLabel _statusSitzung = new();
     private readonly ToolStripStatusLabel _statusUhr = new();
     private readonly TreeView _baum = new();
+    private readonly Modulreiter _reiter = new();
     private readonly System.Windows.Forms.Timer _uhr = new();
     private readonly System.Windows.Forms.Timer _rechteTimer = new();
 
@@ -39,9 +40,9 @@ public sealed class Hauptfenster : Form, IMeldungsanzeige
         BaueStatusleiste();
         BaueKommandoleiste();
         BaueMenue();
+        BaueModulreiter();
 
         MainMenuStrip = _menue;
-        MdiChildActivate += (_, _) => AktualisiereTransaktionsfeld();
 
         _uhr.Interval = 1000;
         _uhr.Tick += (_, _) => _statusUhr.Text = DateTime.Now.ToString("HH:mm:ss");
@@ -136,6 +137,37 @@ public sealed class Hauptfenster : Form, IMeldungsanzeige
         _menue.Items.Add(hilfe);
 
         Controls.Add(_menue);
+    }
+
+    private void BaueModulreiter()
+    {
+        _reiter.TabAktiviert += (_, code) =>
+        {
+            if (code is null)
+            {
+                AktiviereStart();
+                return;
+            }
+
+            var fenster = MdiChildren.OfType<ModulFenster>().FirstOrDefault(m => m.Transaktionscode == code);
+            if (fenster is not null)
+            {
+                AktiviereModul(fenster);
+            }
+        };
+
+        _reiter.TabSchliessenAngefordert += (_, code) =>
+            MdiChildren.OfType<ModulFenster>().FirstOrDefault(m => m.Transaktionscode == code)?.Close();
+
+        _reiter.AlleAusserDiesemSchliessenAngefordert += (_, code) =>
+        {
+            foreach (var fenster in MdiChildren.OfType<ModulFenster>().Where(m => m.Transaktionscode != code).ToArray())
+            {
+                fenster.Close();
+            }
+        };
+
+        Controls.Add(_reiter);
     }
 
     private void BaueKommandoleiste()
@@ -335,12 +367,7 @@ public sealed class Hauptfenster : Form, IMeldungsanzeige
         {
             if (kind is ModulFenster offen && offen.Transaktionscode == eintrag.Transaktionscode)
             {
-                if (offen.WindowState == FormWindowState.Minimized)
-                {
-                    offen.WindowState = FormWindowState.Normal;
-                }
-
-                offen.Activate();
+                AktiviereModul(offen);
                 Hinweis($"{eintrag.Anzeige} ist bereits geöffnet.");
                 return;
             }
@@ -348,20 +375,64 @@ public sealed class Hauptfenster : Form, IMeldungsanzeige
 
         var fenster = eintrag.Erzeuge(_kontext);
         fenster.MdiParent = this;
-        fenster.Location = NaechsterPlatz();
-        fenster.Show();
+        fenster.FormClosed += (_, _) => ModulGeschlossen(fenster);
+        _reiter.Oeffnen(fenster.Transaktionscode, $"{fenster.Transaktionscode} {fenster.Bezeichnung}");
 
+        AktiviereModul(fenster);
+    }
+
+    // "Nach vorn holen" heißt jetzt: den passenden Reiter als aktiv markieren und das zugehörige,
+    // stets maximierte Fenster ohne eigene Titelleiste sichtbar machen (Show() hebt ein zuvor für den
+    // Startreiter ausgeblendetes Fenster auch wieder auf).
+    private void AktiviereModul(ModulFenster fenster)
+    {
+        fenster.Show();
+        fenster.WindowState = FormWindowState.Maximized;
+        fenster.Activate();
+        _reiter.Aktiviere(fenster.Transaktionscode);
         AktualisiereTransaktionsfeld();
     }
 
-    private Point NaechsterPlatz()
+    // Der Startreiter zeigt eine leere Arbeitsfläche. Minimieren scheidet aus - ein minimiertes
+    // MDI-Kindfenster legt trotz ControlBox = false weiterhin eine kleine eigene Symbolleiste mit
+    // Titel und Schließen-Kreuz an den unteren Rand der Arbeitsfläche, was der aufgeräumten Optik
+    // widerspricht. Ausblenden (Visible = false) lässt dagegen wirklich nichts zurück.
+    private void AktiviereStart()
     {
-        var versatz = 24 * (MdiChildren.Length % 6);
-        return new Point(8 + versatz, 8 + versatz);
+        foreach (var kind in MdiChildren.OfType<ModulFenster>())
+        {
+            kind.Visible = false;
+        }
+
+        _reiter.Aktiviere(null);
+        AktualisiereTransaktionsfeld();
     }
 
-    private void AktualisiereTransaktionsfeld() =>
-        _statusCode.Text = ActiveMdiChild is ModulFenster modul ? modul.Transaktionscode : "";
+    // Reagiert sowohl auf das Kreuz am Reiter (dort wird nur Close() aufgerufen, mit derselben
+    // FormClosing-Abfrage wie früher am Fenster selbst) als auch auf ein Schließen durch die
+    // Rechteprüfung - der Reiter verschwindet erst, wenn das Fenster tatsächlich geschlossen wurde.
+    private void ModulGeschlossen(ModulFenster fenster)
+    {
+        var warAktiv = _reiter.AktiverCode == fenster.Transaktionscode;
+        _reiter.Schliessen(fenster.Transaktionscode);
+
+        if (!warAktiv)
+        {
+            return;
+        }
+
+        var naechstes = MdiChildren.OfType<ModulFenster>().FirstOrDefault();
+        if (naechstes is not null)
+        {
+            AktiviereModul(naechstes);
+        }
+        else
+        {
+            AktiviereStart();
+        }
+    }
+
+    private void AktualisiereTransaktionsfeld() => _statusCode.Text = _reiter.AktiverCode ?? "";
 
     private void PruefeAbgelaufeneRechte()
     {
