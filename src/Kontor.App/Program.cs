@@ -7,11 +7,11 @@ namespace Kontor.App;
 internal static class Program
 {
     [STAThread]
-    private static void Main()
+    private static void Main(string[] args)
     {
         Application.SetCompatibleTextRenderingDefault(false);
 
-        var datenbank = Datenbank.Standard();
+        var datenbank = Datenbank.Standard(LiesDatenbankArgument(args));
 
         try
         {
@@ -82,12 +82,39 @@ internal static class Program
 
         var hauptfenster = new Hauptfenster(sitzung, dienste, Modulverzeichnis.Standard());
 
+        var meldungen = new List<string>();
+        if (datenbank.AusAltemSpeicherortUebernommenVon is { } alterPfad)
+        {
+            meldungen.Add($"Datenbank von {alterPfad} nach {datenbank.Dateipfad} übernommen.");
+        }
+
         if (gebucht > 0)
         {
-            hauptfenster.Hinweis($"{gebucht} fällige Buchung(en) aus automatisch geführten Verträgen angelegt.");
+            meldungen.Add($"{gebucht} fällige Buchung(en) aus automatisch geführten Verträgen angelegt.");
+        }
+
+        if (meldungen.Count > 0)
+        {
+            hauptfenster.Hinweis(string.Join(" ", meldungen));
         }
 
         Application.Run(hauptfenster);
+    }
+
+    // Liest --datenbank <pfad> aus den Kommandozeilenargumenten, falls vorhanden - damit lässt sich der
+    // Standardpfad unter %AppData% (der zu genau einem Windows-Konto gehört) für mehrere Benutzer auf
+    // demselben Rechner auf einen gemeinsamen Ordner umlenken, ohne den Code zu ändern.
+    private static string? LiesDatenbankArgument(string[] args)
+    {
+        for (var i = 0; i < args.Length - 1; i++)
+        {
+            if (args[i] == "--datenbank")
+            {
+                return args[i + 1];
+            }
+        }
+
+        return null;
     }
 
     // Beim Programmstart werden für alle automatisch geführten, nicht beendeten Verträge die seit dem
