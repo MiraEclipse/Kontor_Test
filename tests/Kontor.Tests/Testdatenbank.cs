@@ -4,9 +4,13 @@ using Microsoft.Data.Sqlite;
 
 namespace Kontor.Tests;
 
+// Läuft standardmäßig mit dem Systemkontext (Systemrechte übersteuern jede Prüfung), damit bestehende
+// Tests nicht erst Benutzer und Rechte aufbauen müssen. Für Tests, die die Rechteprüfung selbst prüfen
+// wollen, liefert Zugriff(benutzer) einen Kontext mit einem konkreten, nicht privilegierten Benutzer.
 internal sealed class Testdatenbank : IDisposable
 {
     private readonly string _ordner;
+    private readonly Zugriffskontext _systemZugriff;
 
     public Testdatenbank()
     {
@@ -15,25 +19,37 @@ internal sealed class Testdatenbank : IDisposable
 
         Datenbank = new Datenbank(Path.Combine(_ordner, Datenbank.StandardDateiname));
         Datenbank.Vorbereiten();
+
+        _systemZugriff = Zugriffskontext.Systemkontext(Datenbank);
     }
 
     public Datenbank Datenbank { get; }
 
     public string Dateipfad => Datenbank.Dateipfad;
 
-    public BelegRepository Belege => new(Datenbank);
+    public KontoRepository Konten => new(Datenbank, _systemZugriff);
 
-    public KundeRepository Kunden => new(Datenbank);
+    public KategorieRepository Kategorien => new(Datenbank, _systemZugriff);
 
-    public ArtikelRepository Artikel => new(Datenbank);
+    public BuchungRepository Buchungen => new(Datenbank, _systemZugriff);
 
-    public KontoRepository Konten => new(Datenbank);
+    public UmbuchungRepository Umbuchungen => new(Datenbank, _systemZugriff);
+
+    public VertragRepository Vertraege => new(Datenbank, _systemZugriff);
+
+    public VertragspreisRepository Vertragspreise => new(Datenbank, _systemZugriff);
 
     public MandantRepository Mandanten => new(Datenbank);
 
-    public NotizRepository Notizen => new(Datenbank);
+    public NotizRepository Notizen => new(Datenbank, _systemZugriff);
 
-    public KalkulationRepository Kalkulationen => new(Datenbank);
+    public BenutzerRepository Benutzer => new(Datenbank, _systemZugriff);
+
+    public RechtRepository Rechte => new(Datenbank, _systemZugriff);
+
+    public AnmeldeprotokollRepository Anmeldeprotokoll => new(Datenbank);
+
+    public Zugriffskontext Zugriff(Benutzer benutzer) => new(Datenbank, benutzer);
 
     public void MandantAnlegen(int mandantNr, string name)
     {
@@ -54,25 +70,6 @@ internal sealed class Testdatenbank : IDisposable
         using var verbindung = Datenbank.Oeffne();
         using var befehl = verbindung.CreateCommand();
         befehl.CommandText = sql;
-        return Convert.ToInt64(befehl.ExecuteScalar());
-    }
-
-    public long AnzahlBelege() => Zahl("SELECT COUNT(*) FROM Beleg;");
-
-    public long AnzahlPositionen() => Zahl("SELECT COUNT(*) FROM Belegposition;");
-
-    public long AnzahlZeilen() => Zahl("SELECT COUNT(*) FROM Buchungszeile;");
-
-    public long LetzteNummer(int mandantNr, int jahr, Belegart belegart)
-    {
-        using var verbindung = Datenbank.Oeffne();
-        using var befehl = verbindung.CreateCommand();
-        befehl.CommandText =
-            @"SELECT COALESCE(MAX(LetzteNummer), 0) FROM Nummernkreis
-              WHERE MandantNr = @mandant AND Jahr = @jahr AND Belegart = @art;";
-        befehl.Parameters.AddWithValue("@mandant", mandantNr);
-        befehl.Parameters.AddWithValue("@jahr", jahr);
-        befehl.Parameters.AddWithValue("@art", Belegarten.Code(belegart));
         return Convert.ToInt64(befehl.ExecuteScalar());
     }
 

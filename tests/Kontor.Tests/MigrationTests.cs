@@ -1,3 +1,4 @@
+using Kontor.Core.Modell;
 using Kontor.Data;
 using Microsoft.Data.Sqlite;
 using Xunit;
@@ -7,7 +8,7 @@ namespace Kontor.Tests;
 public class MigrationTests
 {
     [Fact]
-    public void MigrationVonVersion1AufVersion2ErhaeltDatenUndInvertiertAktivZuGesperrt()
+    public void EineAlteFirmenDatenbankWirdBisZurAktuellenSchemaversionDurchmigriert()
     {
         var ordner = Path.Combine(Path.GetTempPath(), "kontor-migration-" + Guid.NewGuid().ToString("N"));
         Directory.CreateDirectory(ordner);
@@ -28,53 +29,40 @@ public class MigrationTests
                     Assert.Equal((long)datenbank.SchemaVersion, Convert.ToInt64(version.ExecuteScalar()));
                 }
 
+                // Mandant und SchemaVersion bleiben über den Fachbereichswechsel hinweg erhalten.
                 using (var mandant = verbindung.CreateCommand())
                 {
                     mandant.CommandText = "SELECT Name FROM Mandant WHERE MandantNr = 1;";
                     Assert.Equal("Alter Mandant", Convert.ToString(mandant.ExecuteScalar()));
                 }
 
-                using (var kunde = verbindung.CreateCommand())
+                // Die alten Fachtabellen der Firmenbuchhaltung sind verworfen - es gab keine erhaltenswerten Daten.
+                foreach (var tabelle in new[] { "Kunde", "Artikel", "Beleg", "Belegposition", "Buchungszeile", "Kalkulation", "Nummernkreis" })
                 {
-                    kunde.CommandText = "SELECT Nummer, Name, Gesperrt, UstIdNr FROM Kunde ORDER BY KundeId;";
-                    using var leser = kunde.ExecuteReader();
-
-                    Assert.True(leser.Read());
-                    Assert.Equal("K-0001", leser.GetString(0));
-                    Assert.Equal("Aktiver Kunde", leser.GetString(1));
-                    Assert.Equal(0L, leser.GetInt64(2));
-                    Assert.Equal("", leser.GetString(3));
-
-                    Assert.True(leser.Read());
-                    Assert.Equal("K-0002", leser.GetString(0));
-                    Assert.Equal("Inaktiver Kunde", leser.GetString(1));
-                    Assert.Equal(1L, leser.GetInt64(2));
-
-                    Assert.False(leser.Read());
+                    using var pruefung = verbindung.CreateCommand();
+                    pruefung.CommandText = "SELECT COUNT(*) FROM sqlite_master WHERE type = 'table' AND name = @name;";
+                    pruefung.Parameters.AddWithValue("@name", tabelle);
+                    Assert.Equal(0L, Convert.ToInt64(pruefung.ExecuteScalar()));
                 }
 
-                using (var artikel = verbindung.CreateCommand())
+                // Die neuen Fachtabellen sind angelegt, aber leer - die Migration erzeugt keine Startbefüllung.
+                foreach (var tabelle in new[]
+                         {
+                             "Konto", "Kategorie", "Buchung", "Umbuchung", "Vertrag", "Vertragspreis", "Notiz",
+                             "Benutzer", "Recht", "Anmeldeprotokoll"
+                         })
                 {
-                    artikel.CommandText = "SELECT Nummer, Bezeichnung, Gesperrt FROM Artikel ORDER BY ArtikelId;";
-                    using var leser = artikel.ExecuteReader();
-
-                    Assert.True(leser.Read());
-                    Assert.Equal("A-0001", leser.GetString(0));
-                    Assert.Equal(0L, leser.GetInt64(2));
-
-                    Assert.True(leser.Read());
-                    Assert.Equal("A-0002", leser.GetString(0));
-                    Assert.Equal(1L, leser.GetInt64(2));
-
-                    Assert.False(leser.Read());
+                    using var zaehlung = verbindung.CreateCommand();
+                    zaehlung.CommandText = $"SELECT COUNT(*) FROM {tabelle};";
+                    Assert.Equal(0L, Convert.ToInt64(zaehlung.ExecuteScalar()));
                 }
             }
 
             // Nach der Migration verhält sich die Datenbank wie jede andere: Repositories funktionieren normal.
-            var kunden = new KundeRepository(datenbank);
-            var geladen = kunden.LadeMitNummer(1, "K-0001");
-            Assert.NotNull(geladen);
-            Assert.False(geladen!.Gesperrt);
+            var systemZugriff = Zugriffskontext.Systemkontext(datenbank);
+            var konten = new KontoRepository(datenbank, systemZugriff);
+            var kontoId = konten.Anlegen(new Konto { MandantNr = 1, Bezeichnung = "Girokonto", Art = Kontoart.Giro });
+            Assert.NotNull(konten.Lade(1, kontoId));
 
             SqliteConnection.ClearAllPools();
         }
@@ -92,8 +80,8 @@ public class MigrationTests
         }
     }
 
-    // Baut eine Datenbank exakt so, wie Schritt 2 sie erzeugt hätte (Schemaversion 1, Aktiv statt Gesperrt,
-    // ohne UstIdNr) - unabhängig vom aktuellen Schema.cs, damit der Test einen echten Migrationsschritt prüft.
+    // Baut eine Datenbank exakt so, wie die Firmenbuchhaltung sie in Schemaversion 1 hinterlassen hätte -
+    // unabhängig vom aktuellen Schema.cs, damit der Test die echten Migrationsschritte prüft.
     private static void ErstelleVersion1Datenbank(string pfad)
     {
         using var verbindung = new SqliteConnection($"Data Source={pfad}");
@@ -135,7 +123,6 @@ public class MigrationTests
                 );");
         Exec("CREATE UNIQUE INDEX UX_Kunde_Nummer ON Kunde (MandantNr, Nummer);");
         Exec("INSERT INTO Kunde (MandantNr, Nummer, Name, Aktiv) VALUES (1, 'K-0001', 'Aktiver Kunde', 1);");
-        Exec("INSERT INTO Kunde (MandantNr, Nummer, Name, Aktiv) VALUES (1, 'K-0002', 'Inaktiver Kunde', 0);");
 
         Exec(@"CREATE TABLE Artikel (
                     ArtikelId    INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT,
@@ -150,7 +137,6 @@ public class MigrationTests
                 );");
         Exec("CREATE UNIQUE INDEX UX_Artikel_Nummer ON Artikel (MandantNr, Nummer);");
         Exec("INSERT INTO Artikel (MandantNr, Nummer, Bezeichnung, PreisCent, SteuerSatzBp, Aktiv) VALUES (1, 'A-0001', 'Aktiver Artikel', 1000, 1900, 1);");
-        Exec("INSERT INTO Artikel (MandantNr, Nummer, Bezeichnung, PreisCent, SteuerSatzBp, Aktiv) VALUES (1, 'A-0002', 'Inaktiver Artikel', 2000, 700, 0);");
 
         verbindung.Close();
         SqliteConnection.ClearAllPools();

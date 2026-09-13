@@ -32,8 +32,27 @@ public class ModulFenster : Form
 
     protected int MandantNr => Kontext.MandantNr;
 
+    // Die zum jetzigen Zeitpunkt wirksame Stufe dieses Fensters im aktuellen Haushalt - null, wenn gar
+    // kein Recht (mehr) vorliegt.
+    public Stufe? EffektiveStufe => Dienste.Zugriff.WirksameStufe(MandantNr, Transaktionscode);
+
+    // Für den Zeitgeber in Hauptfenster: ob beim erzwungenen Schließen (Recht abgelaufen) noch
+    // ungesicherte Eingaben bestehen, die vorher zum Sichern angeboten werden sollen.
+    public virtual bool HatUngesicherteEingaben => false;
+
+    public virtual void SichernVersuchen()
+    {
+    }
+
     public void SetzeModus(MaskenModus modus)
     {
+        if (MaskenModi.IstSchreibend(modus) && (EffektiveStufe is null || EffektiveStufe.Value < Stufe.Aendern))
+        {
+            Meldungen.Fehler(
+                $"Keine Berechtigung: {Transaktionscode} erfordert mindestens Stufe {Stufen.Bezeichnung(Stufe.Aendern)}.");
+            return;
+        }
+
         Modus = modus;
         Text = Titel(modus);
 

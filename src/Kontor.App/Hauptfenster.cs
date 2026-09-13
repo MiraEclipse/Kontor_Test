@@ -8,6 +8,7 @@ public sealed class Hauptfenster : Form, IMeldungsanzeige
     private readonly Sitzung _sitzung;
     private readonly Modulverzeichnis _verzeichnis;
     private readonly Modulkontext _kontext;
+    private readonly IReadOnlyList<Moduleintrag> _sichtbareEintraege;
 
     private readonly MenuStrip _menue = new();
     private readonly ToolStrip _leiste = new();
@@ -19,14 +20,16 @@ public sealed class Hauptfenster : Form, IMeldungsanzeige
     private readonly ToolStripStatusLabel _statusUhr = new();
     private readonly TreeView _baum = new();
     private readonly System.Windows.Forms.Timer _uhr = new();
+    private readonly System.Windows.Forms.Timer _rechteTimer = new();
 
     public Hauptfenster(Sitzung sitzung, Dienste dienste, Modulverzeichnis verzeichnis)
     {
         _sitzung = sitzung;
         _verzeichnis = verzeichnis;
-        _kontext = new Modulkontext(sitzung, dienste, this);
+        _kontext = new Modulkontext(sitzung, dienste, this, verzeichnis);
+        _sichtbareEintraege = _verzeichnis.Sichtbare(dienste.Zugriff, sitzung.MandantNr);
 
-        Text = $"KONTOR – {sitzung.Mandant.Name} – {sitzung.Benutzer}";
+        Text = $"KONTOR – {sitzung.Mandant.Name} – {sitzung.Benutzer.Anzeigename}";
         Font = new Font("MS Sans Serif", 8.25f);
         ClientSize = new Size(1000, 640);
         StartPosition = FormStartPosition.CenterScreen;
@@ -44,6 +47,12 @@ public sealed class Hauptfenster : Form, IMeldungsanzeige
         _uhr.Tick += (_, _) => _statusUhr.Text = DateTime.Now.ToString("HH:mm:ss");
         _uhr.Start();
 
+        // Prüft jede Minute, ob ein wirksames Recht für ein offenes Fenster ausgelaufen ist - eine
+        // Befristung, die erst bei der nächsten Anmeldung greift, ist keine.
+        _rechteTimer.Interval = 60_000;
+        _rechteTimer.Tick += (_, _) => PruefeAbgelaufeneRechte();
+        _rechteTimer.Start();
+
         Hinweis("Transaktionscode eingeben oder Modul im Menübaum wählen.");
     }
 
@@ -59,6 +68,8 @@ public sealed class Hauptfenster : Form, IMeldungsanzeige
         {
             _uhr.Stop();
             _uhr.Dispose();
+            _rechteTimer.Stop();
+            _rechteTimer.Dispose();
         }
 
         base.Dispose(disposing);
@@ -90,14 +101,14 @@ public sealed class Hauptfenster : Form, IMeldungsanzeige
 
         var springen = new ToolStripMenuItem("&Springen");
         var ersteGruppe = true;
-        foreach (var gruppe in _verzeichnis.Gruppen())
+        foreach (var gruppe in Gruppen())
         {
             if (!ersteGruppe)
             {
                 springen.DropDownItems.Add(new ToolStripSeparator());
             }
 
-            foreach (var eintrag in _verzeichnis.InGruppe(gruppe))
+            foreach (var eintrag in InGruppe(gruppe))
             {
                 var moduleintrag = eintrag;
                 springen.DropDownItems.Add(new ToolStripMenuItem(
@@ -115,8 +126,8 @@ public sealed class Hauptfenster : Form, IMeldungsanzeige
         hilfe.DropDownItems.Add(Gesperrt("&Inhalt"));
         hilfe.DropDownItems.Add(new ToolStripSeparator());
         hilfe.DropDownItems.Add(new ToolStripMenuItem("Ü&ber KONTOR", null,
-            (_, _) => Hinweis($"KONTOR – Stand {DateTime.Now.Year}, angemeldet als {_sitzung.Benutzer} " +
-                              $"im Mandanten {_sitzung.MandantNr:0000}.")));
+            (_, _) => Hinweis($"KONTOR – Stand {DateTime.Now.Year}, angemeldet als {_sitzung.Benutzer.Anzeigename} " +
+                              $"im Haushalt {_sitzung.MandantNr:0000}.")));
 
         _menue.Items.Add(datei);
         _menue.Items.Add(bearbeiten);
@@ -172,11 +183,11 @@ public sealed class Hauptfenster : Form, IMeldungsanzeige
         _baum.ShowRootLines = true;
         _baum.NodeMouseClick += BaumKlick;
 
-        foreach (var gruppe in _verzeichnis.Gruppen())
+        foreach (var gruppe in Gruppen())
         {
             var gruppenknoten = _baum.Nodes.Add(gruppe);
 
-            foreach (var eintrag in _verzeichnis.InGruppe(gruppe))
+            foreach (var eintrag in InGruppe(gruppe))
             {
                 var knoten = gruppenknoten.Nodes.Add(eintrag.Anzeige);
                 knoten.Tag = eintrag;
@@ -212,7 +223,7 @@ public sealed class Hauptfenster : Form, IMeldungsanzeige
         _statusSitzung.TextAlign = ContentAlignment.MiddleLeft;
         _statusSitzung.BorderSides = ToolStripStatusLabelBorderSides.All;
         _statusSitzung.BorderStyle = Border3DStyle.SunkenOuter;
-        _statusSitzung.Text = $"{_sitzung.Mandant.MandantNr:0000} {_sitzung.Mandant.Name} | {_sitzung.Benutzer}";
+        _statusSitzung.Text = $"{_sitzung.Mandant.MandantNr:0000} {_sitzung.Mandant.Name} | {_sitzung.Benutzer.Anzeigename}";
 
         _statusUhr.AutoSize = false;
         _statusUhr.Width = 64;
@@ -230,6 +241,36 @@ public sealed class Hauptfenster : Form, IMeldungsanzeige
     }
 
     private static ToolStripMenuItem Gesperrt(string text) => new(text) { Enabled = false };
+
+    private IReadOnlyList<string> Gruppen()
+    {
+        var gruppen = new List<string>();
+
+        foreach (var eintrag in _sichtbareEintraege)
+        {
+            if (!gruppen.Contains(eintrag.Gruppe))
+            {
+                gruppen.Add(eintrag.Gruppe);
+            }
+        }
+
+        return gruppen;
+    }
+
+    private IReadOnlyList<Moduleintrag> InGruppe(string gruppe)
+    {
+        var eintraege = new List<Moduleintrag>();
+
+        foreach (var eintrag in _sichtbareEintraege)
+        {
+            if (eintrag.Gruppe == gruppe)
+            {
+                eintraege.Add(eintrag);
+            }
+        }
+
+        return eintraege;
+    }
 
     private void KommandoTaste(object? absender, KeyEventArgs e)
     {
@@ -282,6 +323,14 @@ public sealed class Hauptfenster : Form, IMeldungsanzeige
 
     private void OeffneModul(Moduleintrag eintrag)
     {
+        // Ein Transaktionscode ohne Recht führt zu einer Meldung in der Statuszeile, nicht zu einem
+        // leeren Fenster - auch wenn er (etwa über das Kommandofeld) den Baum umgeht.
+        if (!eintrag.IstSichtbarFuer(_kontext.Dienste.Zugriff, _kontext.MandantNr))
+        {
+            Fehler($"Kein Zugriff auf {eintrag.Transaktionscode} {eintrag.Bezeichnung}.");
+            return;
+        }
+
         foreach (var kind in MdiChildren)
         {
             if (kind is ModulFenster offen && offen.Transaktionscode == eintrag.Transaktionscode)
@@ -313,4 +362,29 @@ public sealed class Hauptfenster : Form, IMeldungsanzeige
 
     private void AktualisiereTransaktionsfeld() =>
         _statusCode.Text = ActiveMdiChild is ModulFenster modul ? modul.Transaktionscode : "";
+
+    private void PruefeAbgelaufeneRechte()
+    {
+        foreach (var kind in MdiChildren.ToArray())
+        {
+            if (kind is not ModulFenster modul)
+            {
+                continue;
+            }
+
+            if (modul.EffektiveStufe is not null)
+            {
+                continue;
+            }
+
+            if (modul.HatUngesicherteEingaben)
+            {
+                modul.SichernVersuchen();
+            }
+
+            var bezeichnung = $"{modul.Transaktionscode} {modul.Bezeichnung}";
+            modul.Close();
+            Fehler($"Recht für {bezeichnung} ist ausgelaufen - Fenster geschlossen.");
+        }
+    }
 }

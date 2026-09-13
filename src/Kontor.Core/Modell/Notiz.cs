@@ -8,7 +8,7 @@ public sealed class Notiz
     public string Text { get; set; } = "";
     public Prioritaet Prioritaet { get; set; } = Prioritaet.Normal;
     public bool Erledigt { get; set; }
-    public int? BelegId { get; set; }
-    public int? KundeId { get; set; }
+    public DateOnly? Faelligkeit { get; set; }
+    public DateOnly? ErledigtAm { get; set; }
     public DateTime Angelegt { get; set; }
 }

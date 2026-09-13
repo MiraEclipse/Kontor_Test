@@ -9,110 +9,125 @@ public class MandantTrennungTests
     private const int Eigener = Startbefuellung.TestmandantNr;
     private const int Fremder = 2;
 
-    private static readonly DateTime Belegdatum = new(2026, 3, 5);
+    private static readonly DateOnly Buchungsdatum = new(2026, 3, 5);
 
     [Fact]
-    public void KundenlisteBlendetFremdeMandantenAus()
+    public void KontenlisteBlendetFremdeHaushalteAus()
     {
         using var test = new Testdatenbank();
-        test.MandantAnlegen(Fremder, "Zweitbetrieb OHG");
+        test.MandantAnlegen(Fremder, "WG-Kasse");
 
-        test.Kunden.Anlegen(Kunde(Eigener, "K-0001", "Eigener Kunde"));
-        var fremder = Kunde(Fremder, "K-0001", "Fremder Kunde");
-        test.Kunden.Anlegen(fremder);
+        var eigeneKonten = test.Konten.Liste(Eigener, auchGesperrte: true);
+        var fremdeKonten = test.Konten.Liste(Fremder, auchGesperrte: true);
 
-        var liste = test.Kunden.Suche(Eigener, "", auchGesperrte: true);
-
-        Assert.Single(liste);
-        Assert.Equal("Eigener Kunde", liste[0].Name);
-        Assert.Null(test.Kunden.Lade(Eigener, fremder.KundeId));
-        Assert.NotNull(test.Kunden.Lade(Fremder, fremder.KundeId));
+        Assert.Equal(2, eigeneKonten.Count);
+        Assert.Equal(2, fremdeKonten.Count);
+        Assert.All(eigeneKonten, k => Assert.Equal(Eigener, k.MandantNr));
+        Assert.Null(test.Konten.Lade(Eigener, fremdeKonten[0].KontoId));
+        Assert.NotNull(test.Konten.Lade(Fremder, fremdeKonten[0].KontoId));
     }
 
     [Fact]
-    public void SuchtextFindetNurDenEigenenMandanten()
+    public void KategorienlisteBlendetFremdeHaushalteAus()
     {
         using var test = new Testdatenbank();
-        test.MandantAnlegen(Fremder, "Zweitbetrieb OHG");
+        test.MandantAnlegen(Fremder, "WG-Kasse");
 
-        test.Kunden.Anlegen(Kunde(Eigener, "K-0001", "Meier"));
-        test.Kunden.Anlegen(Kunde(Fremder, "K-0002", "Meier"));
-
-        Assert.Single(test.Kunden.Suche(Eigener, "Meier", auchGesperrte: true));
-        Assert.Empty(test.Kunden.Suche(Eigener, "Schulze", auchGesperrte: true));
+        Assert.Equal(Startbefuellung.Kategorien.Count, test.Kategorien.Liste(Eigener, auchGesperrte: true).Count);
+        Assert.Equal(Startbefuellung.Kategorien.Count, test.Kategorien.Liste(Fremder, auchGesperrte: true).Count);
+        Assert.All(test.Kategorien.Liste(Eigener, auchGesperrte: true), k => Assert.Equal(Eigener, k.MandantNr));
     }
 
     [Fact]
-    public void BeleglisteUndSaldenBlendenFremdeMandantenAus()
+    public void BuchungslisteUndKontostandBlendenFremdeHaushalteAus()
     {
         using var test = new Testdatenbank();
-        test.MandantAnlegen(Fremder, "Zweitbetrieb OHG");
+        test.MandantAnlegen(Fremder, "WG-Kasse");
 
-        test.Belege.Buchen(Testbelege.Rechnung(Eigener, Belegdatum, 1m, 100m));
-        test.Belege.Buchen(Testbelege.Rechnung(Fremder, Belegdatum, 1m, 500m));
-        test.Belege.Buchen(Testbelege.Rechnung(Fremder, Belegdatum, 1m, 500m));
+        var eigenesKonto = test.Konten.Liste(Eigener, auchGesperrte: true)[0];
+        var eigeneKategorie = test.Kategorien.Liste(Eigener, auchGesperrte: true)[0];
+        var fremdesKonto = test.Konten.Liste(Fremder, auchGesperrte: true)[0];
+        var fremdeKategorie = test.Kategorien.Liste(Fremder, auchGesperrte: true)[0];
 
-        Assert.Single(test.Belege.Liste(Eigener, 2026));
-        Assert.Equal(2, test.Belege.Liste(Fremder, 2026).Count);
-        Assert.Equal(3L, test.AnzahlBelege());
+        test.Buchungen.Anlegen(Buchung(Eigener, eigenesKonto.KontoId, eigeneKategorie.KategorieId, 10000L));
+        test.Buchungen.Anlegen(Buchung(Fremder, fremdesKonto.KontoId, fremdeKategorie.KategorieId, 50000L));
+        test.Buchungen.Anlegen(Buchung(Fremder, fremdesKonto.KontoId, fremdeKategorie.KategorieId, 50000L));
 
-        Assert.Equal(119.00m, Saldo(test, Eigener, "1400"));
-        Assert.Equal(1190.00m, Saldo(test, Fremder, "1400"));
+        Assert.Single(test.Buchungen.Liste(Eigener, Buchungsdatum, Buchungsdatum));
+        Assert.Equal(2, test.Buchungen.Liste(Fremder, Buchungsdatum, Buchungsdatum).Count);
 
-        Assert.Equal("RE-2026-00001", test.Belege.Liste(Eigener, 2026)[0].Nummer);
-        Assert.Equal("RE-2026-00001", test.Belege.Liste(Fremder, 2026)[0].Nummer);
+        var eigenerStand = test.Konten.Kontostand(Eigener, eigenesKonto.KontoId, Buchungsdatum);
+        var fremderStand = test.Konten.Kontostand(Fremder, fremdesKonto.KontoId, Buchungsdatum);
+
+        Assert.Equal(eigenesKonto.AnfangsbestandCent + (eigeneKategorie.Richtung == Richtung.Einnahme ? 10000L : -10000L), eigenerStand);
+        Assert.Equal(fremdesKonto.AnfangsbestandCent + (fremdeKategorie.Richtung == Richtung.Einnahme ? 100000L : -100000L), fremderStand);
     }
 
     [Fact]
-    public void NotizenUndKalkulationenBlendenFremdeMandantenAus()
+    public void NotizenBlendenFremdeHaushalteAus()
     {
         using var test = new Testdatenbank();
-        test.MandantAnlegen(Fremder, "Zweitbetrieb OHG");
+        test.MandantAnlegen(Fremder, "WG-Kasse");
 
         test.Notizen.Anlegen(new Notiz { MandantNr = Eigener, Betreff = "Eigene Notiz" });
         var fremdeNotiz = new Notiz { MandantNr = Fremder, Betreff = "Fremde Notiz" };
         test.Notizen.Anlegen(fremdeNotiz);
 
-        test.Kalkulationen.Sichern(new Kalkulation
-        {
-            MandantNr = Eigener,
-            Bezeichnung = "Eigene Kalkulation",
-            Materialeinzelkosten = 100m,
-            Fertigungsloehne = 50m
-        });
-        var fremdeKalkulation = new Kalkulation
-        {
-            MandantNr = Fremder,
-            Bezeichnung = "Fremde Kalkulation",
-            Materialeinzelkosten = 200m,
-            Fertigungsloehne = 80m
-        };
-        test.Kalkulationen.Sichern(fremdeKalkulation);
-
         Assert.Single(test.Notizen.Liste(Eigener, false));
         Assert.Null(test.Notizen.Lade(Eigener, fremdeNotiz.NotizId));
-        Assert.Single(test.Kalkulationen.Liste(Eigener));
-        Assert.Null(test.Kalkulationen.Lade(Eigener, fremdeKalkulation.KalkulationId));
+        Assert.NotNull(test.Notizen.Lade(Fremder, fremdeNotiz.NotizId));
     }
 
-    private static Kunde Kunde(int mandantNr, string nummer, string name) => new()
+    [Fact]
+    public void VertraegeUndVertragspreiseBlendenFremdeHaushalteAus()
+    {
+        using var test = new Testdatenbank();
+        test.MandantAnlegen(Fremder, "WG-Kasse");
+
+        var eigenesKonto = test.Konten.Liste(Eigener, auchGesperrte: true)[0];
+        var eigeneKategorie = test.Kategorien.Liste(Eigener, auchGesperrte: true)[0];
+        var fremdesKonto = test.Konten.Liste(Fremder, auchGesperrte: true)[0];
+        var fremdeKategorie = test.Kategorien.Liste(Fremder, auchGesperrte: true)[0];
+
+        var eigenerVertrag = new Vertrag
+        {
+            MandantNr = Eigener,
+            Bezeichnung = "Eigener Vertrag",
+            Turnus = Turnus.Monatlich,
+            Beginn = new DateOnly(2026, 1, 1),
+            KategorieId = eigeneKategorie.KategorieId,
+            KontoId = eigenesKonto.KontoId
+        };
+        test.Vertraege.Anlegen(eigenerVertrag);
+
+        var fremderVertrag = new Vertrag
+        {
+            MandantNr = Fremder,
+            Bezeichnung = "Fremder Vertrag",
+            Turnus = Turnus.Monatlich,
+            Beginn = new DateOnly(2026, 1, 1),
+            KategorieId = fremdeKategorie.KategorieId,
+            KontoId = fremdesKonto.KontoId
+        };
+        test.Vertraege.Anlegen(fremderVertrag);
+
+        test.Vertragspreise.Anlegen(new Vertragspreis { MandantNr = Eigener, VertragId = eigenerVertrag.VertragId, GueltigAb = new DateOnly(2026, 1, 1), BetragCent = 500L });
+        test.Vertragspreise.Anlegen(new Vertragspreis { MandantNr = Fremder, VertragId = fremderVertrag.VertragId, GueltigAb = new DateOnly(2026, 1, 1), BetragCent = 900L });
+
+        Assert.Single(test.Vertraege.Liste(Eigener, auchBeendete: true));
+        Assert.Null(test.Vertraege.Lade(Eigener, fremderVertrag.VertragId));
+        Assert.NotNull(test.Vertraege.Lade(Fremder, fremderVertrag.VertragId));
+
+        Assert.Single(test.Vertragspreise.Liste(Eigener, eigenerVertrag.VertragId));
+    }
+
+    private static Buchung Buchung(int mandantNr, int kontoId, int kategorieId, long betragCent) => new()
     {
         MandantNr = mandantNr,
-        Nummer = nummer,
-        Name = name,
-        Ort = "Hamburg"
+        Datum = Buchungsdatum,
+        KontoId = kontoId,
+        KategorieId = kategorieId,
+        BetragCent = betragCent,
+        Text = "Testbuchung"
     };
-
-    private static decimal Saldo(Testdatenbank test, int mandantNr, string kontoNr)
-    {
-        foreach (var saldo in test.Konten.Salden(mandantNr, 2026))
-        {
-            if (saldo.KontoNr == kontoNr)
-            {
-                return saldo.Saldo;
-            }
-        }
-
-        return -1m;
-    }
 }
