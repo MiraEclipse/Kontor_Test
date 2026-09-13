@@ -31,14 +31,14 @@ public sealed class Systemtest : ModulFenster
         Controls.Add(kopf);
         Controls.Add(strich);
 
-        Feld("Mandant:", _mandant, 44, false);
+        Feld("Haushalt:", _mandant, 44, false);
         Feld("Benutzer:", _benutzer, 72, false);
         Feld("Angemeldet:", _angemeldet, 100, false);
         Feld("Bemerkung:", _bemerkung, 128, true);
 
         _mandant.Text = $"{Sitzung.Mandant.MandantNr:0000}  {Sitzung.Mandant.Name}, {Sitzung.Mandant.Ort} " +
                         $"({Sitzung.Mandant.Waehrung})";
-        _benutzer.Text = Sitzung.Benutzer;
+        _benutzer.Text = Sitzung.Benutzer.Anzeigename;
         _angemeldet.Text = Sitzung.Angemeldet.ToString("yyyy-MM-dd HH:mm:ss");
 
         var modusKopf = new Label
@@ -95,8 +95,8 @@ public sealed class Systemtest : ModulFenster
 
     private void ZaehleKonten()
     {
-        var konten = Dienste.Konten.Liste(MandantNr);
-        Meldungen.Erfolg($"Mandant {MandantNr:0000}: {konten.Count} Konten im Kontenrahmen.");
+        var konten = Dienste.Konten.Liste(MandantNr, auchGesperrte: true);
+        Meldungen.Erfolg($"Haushalt {MandantNr:0000}: {konten.Count} Konten.");
     }
 
     private void Feld(string beschriftung, TextBox feld, int oben, bool schreibbar)

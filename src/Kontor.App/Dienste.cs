@@ -5,34 +5,56 @@ namespace Kontor.App;
 public sealed class Dienste
 {
     public Dienste(
+        IZugriffskontext zugriff,
         IMandantRepository mandanten,
-        IKundeRepository kunden,
-        IArtikelRepository artikel,
-        IBelegRepository belege,
         IKontoRepository konten,
-        IKalkulationRepository kalkulationen,
-        INotizRepository notizen)
+        IKategorieRepository kategorien,
+        IBuchungRepository buchungen,
+        IUmbuchungRepository umbuchungen,
+        IVertragRepository vertraege,
+        IVertragspreisRepository vertragspreise,
+        INotizRepository notizen,
+        IBenutzerRepository benutzer,
+        IRechtRepository rechte,
+        IAnmeldeprotokollRepository anmeldeprotokoll)
     {
+        Zugriff = zugriff;
         Mandanten = mandanten;
-        Kunden = kunden;
-        Artikel = artikel;
-        Belege = belege;
         Konten = konten;
-        Kalkulationen = kalkulationen;
+        Kategorien = kategorien;
+        Buchungen = buchungen;
+        Umbuchungen = umbuchungen;
+        Vertraege = vertraege;
+        Vertragspreise = vertragspreise;
         Notizen = notizen;
+        Benutzer = benutzer;
+        Rechte = rechte;
+        Anmeldeprotokoll = anmeldeprotokoll;
     }
+
+    // Wird wie die Repositories durchgereicht: prüft, ob der angemeldete Benutzer eine schreibende
+    // Operation ausführen darf (die Repositories fragen dieselbe Instanz noch einmal selbst).
+    public IZugriffskontext Zugriff { get; }
 
     public IMandantRepository Mandanten { get; }
 
-    public IKundeRepository Kunden { get; }
-
-    public IArtikelRepository Artikel { get; }
-
-    public IBelegRepository Belege { get; }
-
     public IKontoRepository Konten { get; }
 
-    public IKalkulationRepository Kalkulationen { get; }
+    public IKategorieRepository Kategorien { get; }
+
+    public IBuchungRepository Buchungen { get; }
+
+    public IUmbuchungRepository Umbuchungen { get; }
+
+    public IVertragRepository Vertraege { get; }
+
+    public IVertragspreisRepository Vertragspreise { get; }
 
     public INotizRepository Notizen { get; }
+
+    public IBenutzerRepository Benutzer { get; }
+
+    public IRechtRepository Rechte { get; }
+
+    public IAnmeldeprotokollRepository Anmeldeprotokoll { get; }
 }

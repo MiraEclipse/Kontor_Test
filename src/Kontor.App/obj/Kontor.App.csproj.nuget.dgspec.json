@@ -1,17 +1,17 @@
 {
   "format": 1,
   "restore": {
-    "C:\\Users\\Jamjam\\Kontor\\src\\Kontor.App\\Kontor.App.csproj": {}
+    "C:\\Users\\Jamjam\\Desktop\\Kontor\\src\\Kontor.App\\Kontor.App.csproj": {}
   },
   "projects": {
-    "C:\\Users\\Jamjam\\Kontor\\src\\Kontor.App\\Kontor.App.csproj": {
+    "C:\\Users\\Jamjam\\Desktop\\Kontor\\src\\Kontor.App\\Kontor.App.csproj": {
       "version": "1.0.0",
       "restore": {
-        "projectUniqueName": "C:\\Users\\Jamjam\\Kontor\\src\\Kontor.App\\Kontor.App.csproj",
+        "projectUniqueName": "C:\\Users\\Jamjam\\Desktop\\Kontor\\src\\Kontor.App\\Kontor.App.csproj",
         "projectName": "Kontor",
-        "projectPath": "C:\\Users\\Jamjam\\Kontor\\src\\Kontor.App\\Kontor.App.csproj",
+        "projectPath": "C:\\Users\\Jamjam\\Desktop\\Kontor\\src\\Kontor.App\\Kontor.App.csproj",
         "packagesPath": "C:\\Users\\Jamjam\\.nuget\\packages\\",
-        "outputPath": "C:\\Users\\Jamjam\\Kontor\\src\\Kontor.App\\obj\\",
+        "outputPath": "C:\\Users\\Jamjam\\Desktop\\Kontor\\src\\Kontor.App\\obj\\",
         "projectStyle": "PackageReference",
         "configFilePaths": [
           "C:\\Users\\Jamjam\\AppData\\Roaming\\NuGet\\NuGet.Config",
@@ -29,11 +29,11 @@
             "framework": "net8.0-windows7.0",
             "targetAlias": "net8.0-windows",
             "projectReferences": {
-              "C:\\Users\\Jamjam\\Kontor\\src\\Kontor.Core\\Kontor.Core.csproj": {
-                "projectPath": "C:\\Users\\Jamjam\\Kontor\\src\\Kontor.Core\\Kontor.Core.csproj"
+              "C:\\Users\\Jamjam\\Desktop\\Kontor\\src\\Kontor.Core\\Kontor.Core.csproj": {
+                "projectPath": "C:\\Users\\Jamjam\\Desktop\\Kontor\\src\\Kontor.Core\\Kontor.Core.csproj"
               },
-              "C:\\Users\\Jamjam\\Kontor\\src\\Kontor.Data\\Kontor.Data.csproj": {
-                "projectPath": "C:\\Users\\Jamjam\\Kontor\\src\\Kontor.Data\\Kontor.Data.csproj"
+              "C:\\Users\\Jamjam\\Desktop\\Kontor\\src\\Kontor.Data\\Kontor.Data.csproj": {
+                "projectPath": "C:\\Users\\Jamjam\\Desktop\\Kontor\\src\\Kontor.Data\\Kontor.Data.csproj"
               }
             }
           }
@@ -48,7 +48,7 @@
           "auditLevel": "low",
           "auditMode": "direct"
         },
-        "SdkAnalysisLevel": "10.0.300"
+        "SdkAnalysisLevel": "10.0.400"
       },
       "frameworks": {
         "net8.0-windows": {
@@ -68,19 +68,19 @@
           "downloadDependencies": [
             {
               "name": "Microsoft.AspNetCore.App.Ref",
-              "version": "[8.0.28, 8.0.28]"
+              "version": "[8.0.30, 8.0.30]"
             },
             {
               "name": "Microsoft.NETCore.App.Host.win-x64",
-              "version": "[8.0.28, 8.0.28]"
+              "version": "[8.0.30, 8.0.30]"
             },
             {
               "name": "Microsoft.NETCore.App.Ref",
-              "version": "[8.0.28, 8.0.28]"
+              "version": "[8.0.30, 8.0.30]"
             },
             {
               "name": "Microsoft.WindowsDesktop.App.Ref",
-              "version": "[8.0.28, 8.0.28]"
+              "version": "[8.0.30, 8.0.30]"
             }
           ],
           "frameworkReferences": {
@@ -91,18 +91,18 @@
               "privateAssets": "none"
             }
           },
-          "runtimeIdentifierGraphPath": "C:\\Program Files\\dotnet\\sdk\\10.0.301/PortableRuntimeIdentifierGraph.json"
+          "runtimeIdentifierGraphPath": "C:\\Program Files\\dotnet\\sdk\\10.0.400/PortableRuntimeIdentifierGraph.json"
         }
       }
     },
-    "C:\\Users\\Jamjam\\Kontor\\src\\Kontor.Core\\Kontor.Core.csproj": {
+    "C:\\Users\\Jamjam\\Desktop\\Kontor\\src\\Kontor.Core\\Kontor.Core.csproj": {
       "version": "1.0.0",
       "restore": {
-        "projectUniqueName": "C:\\Users\\Jamjam\\Kontor\\src\\Kontor.Core\\Kontor.Core.csproj",
+        "projectUniqueName": "C:\\Users\\Jamjam\\Desktop\\Kontor\\src\\Kontor.Core\\Kontor.Core.csproj",
         "projectName": "Kontor.Core",
-        "projectPath": "C:\\Users\\Jamjam\\Kontor\\src\\Kontor.Core\\Kontor.Core.csproj",
+        "projectPath": "C:\\Users\\Jamjam\\Desktop\\Kontor\\src\\Kontor.Core\\Kontor.Core.csproj",
         "packagesPath": "C:\\Users\\Jamjam\\.nuget\\packages\\",
-        "outputPath": "C:\\Users\\Jamjam\\Kontor\\src\\Kontor.Core\\obj\\",
+        "outputPath": "C:\\Users\\Jamjam\\Desktop\\Kontor\\src\\Kontor.Core\\obj\\",
         "projectStyle": "PackageReference",
         "configFilePaths": [
           "C:\\Users\\Jamjam\\AppData\\Roaming\\NuGet\\NuGet.Config",
@@ -132,7 +132,7 @@
           "auditLevel": "low",
           "auditMode": "direct"
         },
-        "SdkAnalysisLevel": "10.0.300"
+        "SdkAnalysisLevel": "10.0.400"
       },
       "frameworks": {
         "net8.0": {
@@ -152,15 +152,15 @@
           "downloadDependencies": [
             {
               "name": "Microsoft.AspNetCore.App.Ref",
-              "version": "[8.0.28, 8.0.28]"
+              "version": "[8.0.30, 8.0.30]"
             },
             {
               "name": "Microsoft.NETCore.App.Ref",
-              "version": "[8.0.28, 8.0.28]"
+              "version": "[8.0.30, 8.0.30]"
             },
             {
               "name": "Microsoft.WindowsDesktop.App.Ref",
-              "version": "[8.0.28, 8.0.28]"
+              "version": "[8.0.30, 8.0.30]"
             }
           ],
           "frameworkReferences": {
@@ -168,18 +168,18 @@
               "privateAssets": "all"
             }
           },
-          "runtimeIdentifierGraphPath": "C:\\Program Files\\dotnet\\sdk\\10.0.301/PortableRuntimeIdentifierGraph.json"
+          "runtimeIdentifierGraphPath": "C:\\Program Files\\dotnet\\sdk\\10.0.400/PortableRuntimeIdentifierGraph.json"
         }
       }
     },
-    "C:\\Users\\Jamjam\\Kontor\\src\\Kontor.Data\\Kontor.Data.csproj": {
+    "C:\\Users\\Jamjam\\Desktop\\Kontor\\src\\Kontor.Data\\Kontor.Data.csproj": {
       "version": "1.0.0",
       "restore": {
-        "projectUniqueName": "C:\\Users\\Jamjam\\Kontor\\src\\Kontor.Data\\Kontor.Data.csproj",
+        "projectUniqueName": "C:\\Users\\Jamjam\\Desktop\\Kontor\\src\\Kontor.Data\\Kontor.Data.csproj",
         "projectName": "Kontor.Data",
-        "projectPath": "C:\\Users\\Jamjam\\Kontor\\src\\Kontor.Data\\Kontor.Data.csproj",
+        "projectPath": "C:\\Users\\Jamjam\\Desktop\\Kontor\\src\\Kontor.Data\\Kontor.Data.csproj",
         "packagesPath": "C:\\Users\\Jamjam\\.nuget\\packages\\",
-        "outputPath": "C:\\Users\\Jamjam\\Kontor\\src\\Kontor.Data\\obj\\",
+        "outputPath": "C:\\Users\\Jamjam\\Desktop\\Kontor\\src\\Kontor.Data\\obj\\",
         "projectStyle": "PackageReference",
         "configFilePaths": [
           "C:\\Users\\Jamjam\\AppData\\Roaming\\NuGet\\NuGet.Config",
@@ -197,8 +197,8 @@
             "framework": "net8.0",
             "targetAlias": "net8.0",
             "projectReferences": {
-              "C:\\Users\\Jamjam\\Kontor\\src\\Kontor.Core\\Kontor.Core.csproj": {
-                "projectPath": "C:\\Users\\Jamjam\\Kontor\\src\\Kontor.Core\\Kontor.Core.csproj"
+              "C:\\Users\\Jamjam\\Desktop\\Kontor\\src\\Kontor.Core\\Kontor.Core.csproj": {
+                "projectPath": "C:\\Users\\Jamjam\\Desktop\\Kontor\\src\\Kontor.Core\\Kontor.Core.csproj"
               }
             }
           }
@@ -213,7 +213,7 @@
           "auditLevel": "low",
           "auditMode": "direct"
         },
-        "SdkAnalysisLevel": "10.0.300"
+        "SdkAnalysisLevel": "10.0.400"
       },
       "frameworks": {
         "net8.0": {
@@ -239,15 +239,15 @@
           "downloadDependencies": [
             {
               "name": "Microsoft.AspNetCore.App.Ref",
-              "version": "[8.0.28, 8.0.28]"
+              "version": "[8.0.30, 8.0.30]"
             },
             {
               "name": "Microsoft.NETCore.App.Ref",
-              "version": "[8.0.28, 8.0.28]"
+              "version": "[8.0.30, 8.0.30]"
             },
             {
               "name": "Microsoft.WindowsDesktop.App.Ref",
-              "version": "[8.0.28, 8.0.28]"
+              "version": "[8.0.30, 8.0.30]"
             }
           ],
           "frameworkReferences": {
@@ -255,7 +255,7 @@
               "privateAssets": "all"
             }
           },
-          "runtimeIdentifierGraphPath": "C:\\Program Files\\dotnet\\sdk\\10.0.301/PortableRuntimeIdentifierGraph.json"
+          "runtimeIdentifierGraphPath": "C:\\Program Files\\dotnet\\sdk\\10.0.400/PortableRuntimeIdentifierGraph.json"
         }
       }
     }

@@ -1,3 +1,4 @@
+using Kontor.Core.Fachlogik;
 using Kontor.Core.Modell;
 using Kontor.Core.Repositories;
 
@@ -5,15 +6,24 @@ namespace Kontor.App;
 
 public sealed class Anmeldefenster : Form
 {
+    private readonly IBenutzerRepository _benutzer;
+    private readonly IRechtRepository _rechte;
     private readonly IMandantRepository _mandanten;
-    private readonly ComboBox _mandantenliste = new();
-    private readonly TextBox _benutzer = new();
+    private readonly IAnmeldeprotokollRepository _anmeldeprotokoll;
+
+    private readonly TextBox _anmeldename = new();
+    private readonly TextBox _kennwort = new() { PasswordChar = '●' };
+    private readonly ComboBox _haushaltsliste = new();
     private readonly Label _meldung = new();
     private readonly Button _anmelden = new();
 
-    public Anmeldefenster(IMandantRepository mandanten)
+    public Anmeldefenster(
+        IBenutzerRepository benutzer, IRechtRepository rechte, IMandantRepository mandanten, IAnmeldeprotokollRepository anmeldeprotokoll)
     {
+        _benutzer = benutzer;
+        _rechte = rechte;
         _mandanten = mandanten;
+        _anmeldeprotokoll = anmeldeprotokoll;
 
         Text = "KONTOR – Anmeldung";
         Font = new Font("MS Sans Serif", 8.25f);
@@ -21,11 +31,11 @@ public sealed class Anmeldefenster : Form
         StartPosition = FormStartPosition.CenterScreen;
         MaximizeBox = false;
         MinimizeBox = false;
-        ClientSize = new Size(344, 176);
+        ClientSize = new Size(344, 208);
 
         var titel = new Label
         {
-            Text = "KONTOR  Kaufmännische Verwaltung",
+            Text = "KONTOR  Private Haushaltsführung",
             Location = new Point(12, 12),
             Size = new Size(320, 16)
         };
@@ -37,105 +47,231 @@ public sealed class Anmeldefenster : Form
             Size = new Size(320, 2)
         };
 
-        var mandantBeschriftung = new Label
+        var anmeldenameBeschriftung = new Label
         {
-            Text = "&Mandant:",
+            Text = "&Anmeldename:",
             Location = new Point(12, 48),
-            Size = new Size(72, 16),
+            Size = new Size(96, 16),
             TextAlign = ContentAlignment.MiddleLeft
         };
+        _anmeldename.Location = new Point(112, 44);
+        _anmeldename.Size = new Size(220, 20);
+        _anmeldename.MaxLength = 40;
+        _anmeldename.Leave += (_, _) => LadeHaushalte();
 
-        _mandantenliste.DropDownStyle = ComboBoxStyle.DropDownList;
-        _mandantenliste.Location = new Point(88, 44);
-        _mandantenliste.Size = new Size(244, 21);
-        _mandantenliste.DisplayMember = nameof(Mandanteintrag.Anzeige);
-
-        var benutzerBeschriftung = new Label
+        var kennwortBeschriftung = new Label
         {
-            Text = "&Benutzer:",
+            Text = "&Kennwort:",
             Location = new Point(12, 76),
-            Size = new Size(72, 16),
+            Size = new Size(96, 16),
             TextAlign = ContentAlignment.MiddleLeft
         };
+        _kennwort.Location = new Point(112, 72);
+        _kennwort.Size = new Size(220, 20);
 
-        _benutzer.Location = new Point(88, 72);
-        _benutzer.Size = new Size(244, 20);
-        _benutzer.MaxLength = 20;
-        _benutzer.Text = Environment.UserName;
+        var haushaltBeschriftung = new Label
+        {
+            Text = "&Haushalt:",
+            Location = new Point(12, 104),
+            Size = new Size(96, 16),
+            TextAlign = ContentAlignment.MiddleLeft
+        };
+        _haushaltsliste.DropDownStyle = ComboBoxStyle.DropDownList;
+        _haushaltsliste.Location = new Point(112, 100);
+        _haushaltsliste.Size = new Size(220, 21);
+        _haushaltsliste.DisplayMember = nameof(Mandanteintrag.Anzeige);
 
-        _meldung.Location = new Point(12, 136);
+        _meldung.Location = new Point(12, 168);
         _meldung.Size = new Size(320, 32);
         _meldung.ForeColor = Color.DarkRed;
 
         _anmelden.Text = "&Anmelden";
-        _anmelden.Location = new Point(172, 104);
+        _anmelden.Location = new Point(172, 132);
         _anmelden.Size = new Size(76, 24);
         _anmelden.Click += (_, _) => Anmelden();
 
         var abbrechen = new Button
         {
             Text = "A&bbrechen",
-            Location = new Point(256, 104),
+            Location = new Point(256, 132),
             Size = new Size(76, 24),
             DialogResult = DialogResult.Cancel
         };
 
         Controls.Add(titel);
         Controls.Add(strich);
-        Controls.Add(mandantBeschriftung);
-        Controls.Add(_mandantenliste);
-        Controls.Add(benutzerBeschriftung);
-        Controls.Add(_benutzer);
+        Controls.Add(anmeldenameBeschriftung);
+        Controls.Add(_anmeldename);
+        Controls.Add(kennwortBeschriftung);
+        Controls.Add(_kennwort);
+        Controls.Add(haushaltBeschriftung);
+        Controls.Add(_haushaltsliste);
         Controls.Add(_meldung);
         Controls.Add(_anmelden);
         Controls.Add(abbrechen);
 
         AcceptButton = _anmelden;
         CancelButton = abbrechen;
-
-        LadeMandanten();
     }
 
     public Sitzung? Sitzung { get; private set; }
 
-    private void LadeMandanten()
+    // Der Haushalt wird auf die beschränkt, für die (zum jetzigen Zeitpunkt wirksam) Rechte vorliegen -
+    // bei Systemrechten sind das alle. Wird nachgeladen, sobald ein bekannter Anmeldename eingegeben wurde.
+    private void LadeHaushalte()
     {
-        var mandanten = _mandanten.Alle();
+        _haushaltsliste.Items.Clear();
 
-        foreach (var mandant in mandanten)
+        var anmeldename = _anmeldename.Text.Trim();
+        if (anmeldename.Length == 0)
         {
-            _mandantenliste.Items.Add(new Mandanteintrag(mandant));
-        }
-
-        if (_mandantenliste.Items.Count == 0)
-        {
-            _meldung.Text = "Kein Mandant vorhanden. Die Datenbank ist nicht eingerichtet.";
-            _anmelden.Enabled = false;
             return;
         }
 
-        _mandantenliste.SelectedIndex = 0;
+        var benutzer = _benutzer.LadeMitAnmeldename(anmeldename);
+        if (benutzer is null)
+        {
+            return;
+        }
+
+        var alleHaushalte = _mandanten.Alle();
+
+        if (benutzer.Systemrechte)
+        {
+            foreach (var mandant in alleHaushalte)
+            {
+                _haushaltsliste.Items.Add(new Mandanteintrag(mandant));
+            }
+        }
+        else
+        {
+            var rechte = _rechte.Liste(benutzer.BenutzerId);
+            var jetzt = DateTime.Now;
+
+            foreach (var mandant in alleHaushalte)
+            {
+                if (HatIrgendeinWirksamesRecht(rechte, mandant.MandantNr, jetzt))
+                {
+                    _haushaltsliste.Items.Add(new Mandanteintrag(mandant));
+                }
+            }
+        }
+
+        if (_haushaltsliste.Items.Count > 0)
+        {
+            _haushaltsliste.SelectedIndex = 0;
+        }
+    }
+
+    private static bool HatIrgendeinWirksamesRecht(IReadOnlyList<Recht> rechte, int mandantNr, DateTime jetzt)
+    {
+        foreach (var recht in rechte)
+        {
+            if (recht.MandantNr != mandantNr)
+            {
+                continue;
+            }
+
+            if (recht.GueltigVon > jetzt)
+            {
+                continue;
+            }
+
+            if (recht.GueltigBis is { } gueltigBis && gueltigBis <= jetzt)
+            {
+                continue;
+            }
+
+            return true;
+        }
+
+        return false;
     }
 
     private void Anmelden()
     {
-        if (_mandantenliste.SelectedItem is not Mandanteintrag eintrag)
+        var anmeldename = _anmeldename.Text.Trim();
+
+        if (anmeldename.Length == 0)
         {
-            _meldung.Text = "Bitte einen Mandanten auswählen.";
+            _meldung.Text = "Bitte einen Anmeldenamen eingeben.";
+            _anmeldename.Focus();
             return;
         }
 
-        var benutzer = _benutzer.Text.Trim();
-        if (benutzer.Length == 0)
+        Verzoegern(anmeldename);
+
+        var benutzer = _benutzer.LadeMitAnmeldename(anmeldename);
+        var ergebnis = Pruefen(benutzer);
+        _anmeldeprotokoll.Erfassen(anmeldename, ergebnis);
+
+        if (ergebnis != AnmeldeErgebnis.Erfolg)
         {
-            _meldung.Text = "Bitte einen Benutzernamen eingeben.";
-            _benutzer.Focus();
+            _meldung.Text = AnmeldeErgebnisse.Bezeichnung(ergebnis) + ".";
+            _kennwort.Clear();
+            _kennwort.Focus();
             return;
         }
+
+        if (_haushaltsliste.SelectedItem is not Mandanteintrag eintrag)
+        {
+            _meldung.Text = "Bitte einen Haushalt auswählen.";
+            return;
+        }
+
+        _benutzer.LetzteAnmeldungSetzen(benutzer!.BenutzerId, DateTime.Now);
 
         Sitzung = new Sitzung(eintrag.Mandant, benutzer);
         DialogResult = DialogResult.OK;
         Close();
+    }
+
+    private AnmeldeErgebnis Pruefen(Benutzer? benutzer)
+    {
+        if (benutzer is null)
+        {
+            return AnmeldeErgebnis.UnbekannterBenutzer;
+        }
+
+        if (benutzer.Gesperrt)
+        {
+            return AnmeldeErgebnis.Gesperrt;
+        }
+
+        if (!Kennwort.Pruefe(_kennwort.Text, benutzer.KennwortHash, benutzer.Salz, benutzer.Durchlaeufe))
+        {
+            return AnmeldeErgebnis.FalschesKennwort;
+        }
+
+        return AnmeldeErgebnis.Erfolg;
+    }
+
+    // Keine Kontosperre bei Fehlversuchen, sondern eine mit jedem Versuch wachsende Verzögerung -
+    // eine Sperre führt in einer Familie nur dazu, dass man sich gegenseitig aussperrt.
+    private void Verzoegern(string anmeldename)
+    {
+        var fehlversuche = _anmeldeprotokoll.FehlversucheInFolge(anmeldename);
+        var wartezeit = Anmeldeverzoegerung.Fuer(fehlversuche);
+
+        if (wartezeit <= TimeSpan.Zero)
+        {
+            return;
+        }
+
+        _meldung.ForeColor = Color.DarkRed;
+        _meldung.Text = $"Zu viele Fehlversuche. Bitte {wartezeit.TotalSeconds:0} Sekunden warten…";
+        _meldung.Refresh();
+
+        var vorherigerCursor = Cursor;
+        Cursor = Cursors.WaitCursor;
+        try
+        {
+            Thread.Sleep(wartezeit);
+        }
+        finally
+        {
+            Cursor = vorherigerCursor;
+        }
     }
 
     private sealed class Mandanteintrag

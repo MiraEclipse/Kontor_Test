@@ -1,4 +1,3 @@
-using Kontor.Core.Fachlogik;
 using Kontor.Core.Modell;
 using Kontor.Data;
 using Microsoft.Data.Sqlite;
@@ -27,11 +26,12 @@ public class SchemaTests
         test.Datenbank.Vorbereiten();
 
         Assert.Equal(1L, test.Zahl("SELECT COUNT(*) FROM Mandant;"));
-        Assert.Equal(Startbefuellung.Kontenrahmen.Count, (int)test.Zahl("SELECT COUNT(*) FROM Konto;"));
+        Assert.Equal(2L, test.Zahl("SELECT COUNT(*) FROM Konto;"));
+        Assert.Equal(Startbefuellung.Kategorien.Count, (int)test.Zahl("SELECT COUNT(*) FROM Kategorie;"));
     }
 
     [Fact]
-    public void TestmandantUndKontenrahmenSindVorhanden()
+    public void HaushaltGirokontoBargeldUndKategorienSindVorhanden()
     {
         using var test = new Testdatenbank();
 
@@ -40,32 +40,16 @@ public class SchemaTests
         Assert.NotNull(mandant);
         Assert.Equal("EUR", mandant!.Waehrung);
         Assert.NotEmpty(mandant.Name);
-        Assert.Equal(Startbefuellung.Kontenrahmen.Count, test.Konten.Liste(Startbefuellung.TestmandantNr).Count);
-    }
 
-    [Fact]
-    public void KontenrahmenDecktDieKontenzuordnungAb()
-    {
-        using var test = new Testdatenbank();
+        var konten = test.Konten.Liste(Startbefuellung.TestmandantNr, auchGesperrte: true);
+        Assert.Equal(2, konten.Count);
+        Assert.Contains(konten, k => k.Bezeichnung == "Girokonto" && k.Art == Kontoart.Giro);
+        Assert.Contains(konten, k => k.Bezeichnung == "Bargeld" && k.Art == Kontoart.Bar);
 
-        var vorhanden = new List<string>();
-        foreach (var konto in test.Konten.Liste(Startbefuellung.TestmandantNr))
-        {
-            vorhanden.Add(konto.KontoNr);
-        }
-
-        Assert.Contains(Kontenzuordnung.Standard.Forderungen, vorhanden);
-        Assert.Contains(Kontenzuordnung.Standard.Bank, vorhanden);
-
-        foreach (var schluessel in Kontenzuordnung.Standard.Steuer)
-        {
-            Assert.Contains(schluessel.Erloeskonto, vorhanden);
-
-            if (schluessel.Steuerkonto.Length > 0)
-            {
-                Assert.Contains(schluessel.Steuerkonto, vorhanden);
-            }
-        }
+        var kategorien = test.Kategorien.Liste(Startbefuellung.TestmandantNr, auchGesperrte: true);
+        Assert.Equal(Startbefuellung.Kategorien.Count, kategorien.Count);
+        Assert.Contains(kategorien, k => k.Bezeichnung == "Gehalt" && k.Richtung == Richtung.Einnahme);
+        Assert.Contains(kategorien, k => k.Bezeichnung == "Miete" && k.Richtung == Richtung.Ausgabe);
     }
 
     [Fact]
@@ -81,15 +65,15 @@ public class SchemaTests
     {
         using var test = new Testdatenbank();
 
-        var fehler = Assert.Throws<SqliteException>(() => test.Kunden.Anlegen(new Kunde
+        var fehler = Assert.Throws<SqliteException>(() => test.Konten.Anlegen(new Konto
         {
             MandantNr = 99,
-            Nummer = "K-0001",
-            Name = "Kunde ohne Mandant"
+            Bezeichnung = "Konto ohne Haushalt",
+            Art = Kontoart.Giro
         }));
 
         Assert.Contains("FOREIGN KEY", fehler.Message);
-        Assert.Equal(0L, test.Zahl("SELECT COUNT(*) FROM Kunde;"));
+        Assert.Equal(2L, test.Zahl("SELECT COUNT(*) FROM Konto;"));
     }
 
     [Fact]
@@ -97,38 +81,45 @@ public class SchemaTests
     {
         using var test = new Testdatenbank();
 
-        var artikel = new Artikel
+        var konto = new Konto
         {
             MandantNr = Startbefuellung.TestmandantNr,
-            Nummer = "A-0001",
-            Bezeichnung = "Prüfartikel",
-            Einheit = "ST",
-            Preis = 12.345m,
-            SteuerSatz = 19m
+            Bezeichnung = "Sparkonto",
+            Art = Kontoart.Sparen,
+            AnfangsbestandCent = 123456L
         };
 
-        test.Artikel.Anlegen(artikel);
+        test.Konten.Anlegen(konto);
 
-        Assert.Equal("integer", test.SpaltenTyp("SELECT typeof(PreisCent) FROM Artikel LIMIT 1;"));
-        Assert.Equal(1235L, test.Zahl("SELECT PreisCent FROM Artikel LIMIT 1;"));
+        Assert.Equal("integer", test.SpaltenTyp($"SELECT typeof(AnfangsbestandCent) FROM Konto WHERE KontoId = {konto.KontoId};"));
+        Assert.Equal(123456L, test.Zahl($"SELECT AnfangsbestandCent FROM Konto WHERE KontoId = {konto.KontoId};"));
 
-        var gelesen = test.Artikel.Lade(Startbefuellung.TestmandantNr, artikel.ArtikelId);
+        var gelesen = test.Konten.Lade(Startbefuellung.TestmandantNr, konto.KontoId);
 
         Assert.NotNull(gelesen);
-        Assert.Equal(12.35m, gelesen!.Preis);
-        Assert.Equal(19m, gelesen.SteuerSatz);
+        Assert.Equal(123456L, gelesen!.AnfangsbestandCent);
     }
 
     [Fact]
-    public void DatumUndZeitstempelStehenAlsTextInDerDatenbank()
+    public void DatumStehtAlsTextInDerDatenbank()
     {
         using var test = new Testdatenbank();
 
-        test.Belege.Buchen(Testbelege.Rechnung(Startbefuellung.TestmandantNr, new DateTime(2026, 3, 5), 1m, 100m));
+        var konten = test.Konten.Liste(Startbefuellung.TestmandantNr, auchGesperrte: true);
+        var kategorien = test.Kategorien.Liste(Startbefuellung.TestmandantNr, auchGesperrte: true);
 
-        Assert.Equal("text", test.SpaltenTyp("SELECT typeof(Belegdatum) FROM Beleg LIMIT 1;"));
-        Assert.Equal("2026-03-05", test.SpaltenTyp("SELECT Belegdatum FROM Beleg LIMIT 1;"));
-        Assert.Equal(1L, test.Zahl("SELECT COUNT(*) FROM Beleg WHERE LENGTH(Erfasst) = 19;"));
+        test.Buchungen.Anlegen(new Buchung
+        {
+            MandantNr = Startbefuellung.TestmandantNr,
+            Datum = new DateOnly(2026, 3, 5),
+            KontoId = konten[0].KontoId,
+            KategorieId = kategorien[0].KategorieId,
+            BetragCent = 100L,
+            Text = "Test"
+        });
+
+        Assert.Equal("text", test.SpaltenTyp("SELECT typeof(Datum) FROM Buchung LIMIT 1;"));
+        Assert.Equal("2026-03-05", test.SpaltenTyp("SELECT Datum FROM Buchung LIMIT 1;"));
     }
 
     [Fact]
@@ -152,14 +143,5 @@ public class SchemaTests
         Assert.Equal(5, fehler.SqliteErrorCode);
 
         transaktion.Rollback();
-    }
-
-    [Fact]
-    public void EindeutigeBelegnummerWirdErzwungen()
-    {
-        using var test = new Testdatenbank();
-
-        Assert.Equal(1L, test.Zahl(
-            "SELECT COUNT(*) FROM sqlite_master WHERE type = 'index' AND name = 'UX_Beleg_Nummer';"));
     }
 }

@@ -4,7 +4,7 @@ namespace Kontor.Data;
 
 internal static class Schema
 {
-    public const int Version = 2;
+    public const int Version = 4;
 
     public static bool Vorhanden(SqliteConnection verbindung)
     {
@@ -28,7 +28,17 @@ internal static class Schema
 
     public static void Anlegen(SqliteConnection verbindung, SqliteTransaction transaktion)
     {
-        foreach (var anweisung in Anweisungen)
+        foreach (var anweisung in InfrastrukturAnweisungen)
+        {
+            Befehle.Fuehre(verbindung, transaktion, anweisung);
+        }
+
+        foreach (var anweisung in AuthAnweisungen)
+        {
+            Befehle.Fuehre(verbindung, transaktion, anweisung);
+        }
+
+        foreach (var anweisung in FachbereichAnweisungen)
         {
             Befehle.Fuehre(verbindung, transaktion, anweisung);
         }
@@ -40,7 +50,8 @@ internal static class Schema
         befehl.ExecuteNonQuery();
     }
 
-    private static readonly string[] Anweisungen =
+    // Bleiben über einen Fachbereichswechsel hinweg bestehen.
+    internal static readonly string[] InfrastrukturAnweisungen =
     {
         @"CREATE TABLE SchemaVersion (
             Id       INTEGER NOT NULL PRIMARY KEY CHECK (Id = 1),
@@ -53,139 +64,153 @@ internal static class Schema
             Name      TEXT    NOT NULL,
             Ort       TEXT    NOT NULL DEFAULT '',
             Waehrung  TEXT    NOT NULL DEFAULT 'EUR'
-        );",
+        );"
+    };
 
-        @"CREATE TABLE Konto (
-            MandantNr   INTEGER NOT NULL REFERENCES Mandant (MandantNr),
-            KontoNr     TEXT    NOT NULL,
-            Bezeichnung TEXT    NOT NULL,
-            Art         TEXT    NOT NULL CHECK (Art IN ('A', 'P', 'E', 'W')),
-            PRIMARY KEY (MandantNr, KontoNr)
+    // Anmeldung und Rechte - bleiben wie Mandant/SchemaVersion über einen Fachbereichswechsel hinweg
+    // bestehen, kamen aber erst mit Schemaversion 4 hinzu.
+    internal static readonly string[] AuthAnweisungen =
+    {
+        @"CREATE TABLE Benutzer (
+            BenutzerId      INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT,
+            Anmeldename     TEXT    NOT NULL,
+            Anzeigename     TEXT    NOT NULL,
+            KennwortHash    BLOB    NOT NULL,
+            Salz            BLOB    NOT NULL,
+            Durchlaeufe     INTEGER NOT NULL CHECK (Durchlaeufe > 0),
+            Systemrechte    INTEGER NOT NULL DEFAULT 0 CHECK (Systemrechte IN (0, 1)),
+            Gesperrt        INTEGER NOT NULL DEFAULT 0 CHECK (Gesperrt IN (0, 1)),
+            Angelegt        TEXT    NOT NULL,
+            LetzteAnmeldung TEXT    NULL
         );",
+        "CREATE UNIQUE INDEX UX_Benutzer_Anmeldename ON Benutzer (Anmeldename);",
 
-        @"CREATE TABLE Kunde (
-            KundeId   INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT,
-            MandantNr INTEGER NOT NULL REFERENCES Mandant (MandantNr),
-            Nummer    TEXT    NOT NULL,
-            Name      TEXT    NOT NULL,
-            Strasse   TEXT    NOT NULL DEFAULT '',
-            Plz       TEXT    NOT NULL DEFAULT '',
-            Ort       TEXT    NOT NULL DEFAULT '',
-            Telefon   TEXT    NOT NULL DEFAULT '',
-            UstIdNr   TEXT    NOT NULL DEFAULT '',
-            Gesperrt  INTEGER NOT NULL DEFAULT 0 CHECK (Gesperrt IN (0, 1)),
-            UNIQUE (KundeId, MandantNr)
-        );",
-        "CREATE INDEX IX_Kunde_Mandant ON Kunde (MandantNr);",
-        "CREATE UNIQUE INDEX UX_Kunde_Nummer ON Kunde (MandantNr, Nummer);",
-
-        @"CREATE TABLE Artikel (
-            ArtikelId    INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT,
-            MandantNr    INTEGER NOT NULL REFERENCES Mandant (MandantNr),
-            Nummer       TEXT    NOT NULL,
-            Bezeichnung  TEXT    NOT NULL,
-            Einheit      TEXT    NOT NULL DEFAULT 'ST',
-            PreisCent    INTEGER NOT NULL CHECK (PreisCent >= 0),
-            SteuerSatzBp INTEGER NOT NULL CHECK (SteuerSatzBp >= 0),
-            Gesperrt     INTEGER NOT NULL DEFAULT 0 CHECK (Gesperrt IN (0, 1)),
-            UNIQUE (ArtikelId, MandantNr)
-        );",
-        "CREATE INDEX IX_Artikel_Mandant ON Artikel (MandantNr);",
-        "CREATE UNIQUE INDEX UX_Artikel_Nummer ON Artikel (MandantNr, Nummer);",
-
-        @"CREATE TABLE Nummernkreis (
-            MandantNr    INTEGER NOT NULL REFERENCES Mandant (MandantNr),
-            Jahr         INTEGER NOT NULL CHECK (Jahr > 0),
-            Belegart     TEXT    NOT NULL CHECK (Belegart IN ('RE', 'GU', 'ZA')),
-            LetzteNummer INTEGER NOT NULL DEFAULT 0 CHECK (LetzteNummer >= 0),
-            PRIMARY KEY (MandantNr, Jahr, Belegart)
-        );",
-
-        @"CREATE TABLE Beleg (
-            BelegId      INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT,
-            MandantNr    INTEGER NOT NULL REFERENCES Mandant (MandantNr),
-            Nummer       TEXT    NOT NULL,
-            Belegart     TEXT    NOT NULL CHECK (Belegart IN ('RE', 'GU', 'ZA')),
-            Belegdatum   TEXT    NOT NULL,
-            KundeId      INTEGER NULL,
-            StorniertVon INTEGER NULL,
-            Erfasst      TEXT    NOT NULL,
-            UNIQUE (BelegId, MandantNr),
-            FOREIGN KEY (KundeId, MandantNr) REFERENCES Kunde (KundeId, MandantNr),
-            FOREIGN KEY (StorniertVon, MandantNr) REFERENCES Beleg (BelegId, MandantNr)
-        );",
-        "CREATE UNIQUE INDEX UX_Beleg_Nummer ON Beleg (MandantNr, Nummer);",
-        "CREATE UNIQUE INDEX UX_Beleg_StorniertVon ON Beleg (StorniertVon, MandantNr);",
-        "CREATE INDEX IX_Beleg_Mandant_Datum ON Beleg (MandantNr, Belegdatum);",
-        "CREATE INDEX IX_Beleg_Kunde ON Beleg (KundeId, MandantNr);",
-
-        @"CREATE TABLE Belegposition (
-            PositionId       INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT,
-            MandantNr        INTEGER NOT NULL REFERENCES Mandant (MandantNr),
-            BelegId          INTEGER NOT NULL,
-            PosNr            INTEGER NOT NULL CHECK (PosNr > 0),
-            ArtikelId        INTEGER NULL,
-            Bezeichnung      TEXT    NOT NULL,
-            Einheit          TEXT    NOT NULL DEFAULT 'ST',
-            MengeTausendstel INTEGER NOT NULL CHECK (MengeTausendstel > 0),
-            EinzelpreisCent  INTEGER NOT NULL CHECK (EinzelpreisCent >= 0),
-            SteuerSatzBp     INTEGER NOT NULL CHECK (SteuerSatzBp >= 0),
-            FOREIGN KEY (BelegId, MandantNr) REFERENCES Beleg (BelegId, MandantNr),
-            FOREIGN KEY (ArtikelId, MandantNr) REFERENCES Artikel (ArtikelId, MandantNr)
-        );",
-        "CREATE INDEX IX_Belegposition_Beleg ON Belegposition (BelegId, MandantNr);",
-        "CREATE INDEX IX_Belegposition_Artikel ON Belegposition (ArtikelId, MandantNr);",
-        "CREATE UNIQUE INDEX UX_Belegposition_PosNr ON Belegposition (BelegId, PosNr);",
-
-        @"CREATE TABLE Buchungszeile (
-            ZeileId    INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT,
+        // Rechte werden nie gelöscht - Entziehen setzt nur GueltigBis, damit nachvollziehbar bleibt,
+        // wer wann wofür freigeschaltet war.
+        @"CREATE TABLE Recht (
+            RechtId    INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT,
+            BenutzerId INTEGER NOT NULL REFERENCES Benutzer (BenutzerId),
             MandantNr  INTEGER NOT NULL REFERENCES Mandant (MandantNr),
-            BelegId    INTEGER NOT NULL,
-            KontoNr    TEXT    NOT NULL,
-            BetragCent INTEGER NOT NULL CHECK (BetragCent > 0),
-            SollHaben  TEXT    NOT NULL CHECK (SollHaben IN ('S', 'H')),
-            FOREIGN KEY (BelegId, MandantNr) REFERENCES Beleg (BelegId, MandantNr),
-            FOREIGN KEY (MandantNr, KontoNr) REFERENCES Konto (MandantNr, KontoNr)
+            Bereich    TEXT    NOT NULL,
+            Stufe      TEXT    NOT NULL CHECK (Stufe IN ('L', 'A', 'V')),
+            GueltigVon TEXT    NOT NULL,
+            GueltigBis TEXT    NULL,
+            ErteiltVon INTEGER NOT NULL REFERENCES Benutzer (BenutzerId),
+            ErteiltAm  TEXT    NOT NULL
         );",
-        "CREATE INDEX IX_Buchungszeile_Beleg ON Buchungszeile (BelegId, MandantNr);",
-        "CREATE INDEX IX_Buchungszeile_Konto ON Buchungszeile (MandantNr, KontoNr);",
+        "CREATE INDEX IX_Recht_Benutzer ON Recht (BenutzerId);",
 
-        @"CREATE TABLE Kalkulation (
-            KalkulationId                 INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT,
-            MandantNr                     INTEGER NOT NULL REFERENCES Mandant (MandantNr),
-            ArtikelId                     INTEGER NULL,
-            Bezeichnung                   TEXT    NOT NULL,
-            MaterialeinzelkostenCent      INTEGER NOT NULL CHECK (MaterialeinzelkostenCent >= 0),
-            MaterialgemeinkostenSatzBp    INTEGER NOT NULL CHECK (MaterialgemeinkostenSatzBp >= 0),
-            FertigungsloehneCent          INTEGER NOT NULL CHECK (FertigungsloehneCent >= 0),
-            FertigungsgemeinkostenSatzBp  INTEGER NOT NULL CHECK (FertigungsgemeinkostenSatzBp >= 0),
-            VerwaltungsgemeinkostenSatzBp INTEGER NOT NULL CHECK (VerwaltungsgemeinkostenSatzBp >= 0),
-            VertriebsgemeinkostenSatzBp   INTEGER NOT NULL CHECK (VertriebsgemeinkostenSatzBp >= 0),
-            GewinnzuschlagSatzBp          INTEGER NOT NULL CHECK (GewinnzuschlagSatzBp >= 0),
-            SkontoSatzBp                  INTEGER NOT NULL CHECK (SkontoSatzBp >= 0 AND SkontoSatzBp < 10000),
-            RabattSatzBp                  INTEGER NOT NULL CHECK (RabattSatzBp >= 0 AND RabattSatzBp < 10000),
-            UmsatzsteuerSatzBp            INTEGER NOT NULL CHECK (UmsatzsteuerSatzBp >= 0),
-            Erfasst                       TEXT    NOT NULL,
-            FOREIGN KEY (ArtikelId, MandantNr) REFERENCES Artikel (ArtikelId, MandantNr)
+        @"CREATE TABLE Anmeldeprotokoll (
+            EintragId   INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT,
+            Zeitpunkt   TEXT    NOT NULL,
+            Anmeldename TEXT    NOT NULL,
+            Ergebnis    TEXT    NOT NULL CHECK (Ergebnis IN ('OK', 'UNBEKANNT', 'KENNWORT', 'GESPERRT'))
         );",
-        "CREATE INDEX IX_Kalkulation_Mandant ON Kalkulation (MandantNr);",
-        "CREATE INDEX IX_Kalkulation_Artikel ON Kalkulation (ArtikelId, MandantNr);",
+        "CREATE INDEX IX_Anmeldeprotokoll_Anmeldename ON Anmeldeprotokoll (Anmeldename, Zeitpunkt);"
+    };
+
+    // Der fachliche Teil des Schemas - wird bei einer Neuanlage direkt erzeugt und bei einem
+    // Fachbereichswechsel (Migration) nach dem Verwerfen der alten Tabellen erneut ausgeführt.
+    internal static readonly string[] FachbereichAnweisungen =
+    {
+        @"CREATE TABLE Konto (
+            KontoId            INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT,
+            MandantNr          INTEGER NOT NULL REFERENCES Mandant (MandantNr),
+            Bezeichnung        TEXT    NOT NULL,
+            Art                TEXT    NOT NULL CHECK (Art IN ('G', 'B', 'S', 'K')),
+            AnfangsbestandCent INTEGER NOT NULL DEFAULT 0,
+            Gesperrt           INTEGER NOT NULL DEFAULT 0 CHECK (Gesperrt IN (0, 1)),
+            UNIQUE (KontoId, MandantNr)
+        );",
+        "CREATE INDEX IX_Konto_Mandant ON Konto (MandantNr);",
+
+        @"CREATE TABLE Kategorie (
+            KategorieId INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT,
+            MandantNr   INTEGER NOT NULL REFERENCES Mandant (MandantNr),
+            Bezeichnung TEXT    NOT NULL,
+            Richtung    TEXT    NOT NULL CHECK (Richtung IN ('E', 'A')),
+            Gesperrt    INTEGER NOT NULL DEFAULT 0 CHECK (Gesperrt IN (0, 1)),
+            UNIQUE (KategorieId, MandantNr)
+        );",
+        "CREATE INDEX IX_Kategorie_Mandant ON Kategorie (MandantNr);",
+
+        @"CREATE TABLE Vertrag (
+            VertragId              INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT,
+            MandantNr              INTEGER NOT NULL REFERENCES Mandant (MandantNr),
+            Bezeichnung            TEXT    NOT NULL,
+            Anbieter               TEXT    NOT NULL DEFAULT '',
+            Turnus                 TEXT    NOT NULL CHECK (Turnus IN ('M', 'Q', 'H', 'J')),
+            Beginn                 TEXT    NOT NULL,
+            MindestlaufzeitMonate  INTEGER NOT NULL DEFAULT 0 CHECK (MindestlaufzeitMonate >= 0),
+            KuendigungsfristMonate INTEGER NOT NULL DEFAULT 0 CHECK (KuendigungsfristMonate >= 0),
+            KategorieId            INTEGER NOT NULL,
+            KontoId                INTEGER NOT NULL,
+            AutomatischBuchen      INTEGER NOT NULL DEFAULT 0 CHECK (AutomatischBuchen IN (0, 1)),
+            GekuendigtZum          TEXT    NULL,
+            Beendet                INTEGER NOT NULL DEFAULT 0 CHECK (Beendet IN (0, 1)),
+            UNIQUE (VertragId, MandantNr),
+            FOREIGN KEY (KategorieId, MandantNr) REFERENCES Kategorie (KategorieId, MandantNr),
+            FOREIGN KEY (KontoId, MandantNr) REFERENCES Konto (KontoId, MandantNr)
+        );",
+        "CREATE INDEX IX_Vertrag_Mandant ON Vertrag (MandantNr);",
+        "CREATE INDEX IX_Vertrag_Kategorie ON Vertrag (KategorieId, MandantNr);",
+        "CREATE INDEX IX_Vertrag_Konto ON Vertrag (KontoId, MandantNr);",
+
+        @"CREATE TABLE Vertragspreis (
+            VertragspreisId INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT,
+            MandantNr       INTEGER NOT NULL REFERENCES Mandant (MandantNr),
+            VertragId       INTEGER NOT NULL,
+            GueltigAb       TEXT    NOT NULL,
+            BetragCent      INTEGER NOT NULL CHECK (BetragCent >= 0),
+            FOREIGN KEY (VertragId, MandantNr) REFERENCES Vertrag (VertragId, MandantNr)
+        );",
+        "CREATE INDEX IX_Vertragspreis_Vertrag ON Vertragspreis (VertragId, MandantNr);",
+
+        @"CREATE TABLE Buchung (
+            BuchungId   INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT,
+            MandantNr   INTEGER NOT NULL REFERENCES Mandant (MandantNr),
+            Datum       TEXT    NOT NULL,
+            KontoId     INTEGER NOT NULL,
+            KategorieId INTEGER NOT NULL,
+            BetragCent  INTEGER NOT NULL CHECK (BetragCent > 0),
+            Text        TEXT    NOT NULL DEFAULT '',
+            VertragId   INTEGER NULL,
+            FOREIGN KEY (KontoId, MandantNr) REFERENCES Konto (KontoId, MandantNr),
+            FOREIGN KEY (KategorieId, MandantNr) REFERENCES Kategorie (KategorieId, MandantNr),
+            FOREIGN KEY (VertragId, MandantNr) REFERENCES Vertrag (VertragId, MandantNr)
+        );",
+        "CREATE INDEX IX_Buchung_Mandant_Datum ON Buchung (MandantNr, Datum);",
+        "CREATE INDEX IX_Buchung_Konto ON Buchung (KontoId, MandantNr);",
+        "CREATE INDEX IX_Buchung_Kategorie ON Buchung (KategorieId, MandantNr);",
+        "CREATE INDEX IX_Buchung_Vertrag ON Buchung (VertragId, MandantNr);",
+
+        @"CREATE TABLE Umbuchung (
+            UmbuchungId INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT,
+            MandantNr   INTEGER NOT NULL REFERENCES Mandant (MandantNr),
+            Datum       TEXT    NOT NULL,
+            VonKontoId  INTEGER NOT NULL,
+            NachKontoId INTEGER NOT NULL,
+            BetragCent  INTEGER NOT NULL CHECK (BetragCent > 0),
+            Text        TEXT    NOT NULL DEFAULT '',
+            FOREIGN KEY (VonKontoId, MandantNr) REFERENCES Konto (KontoId, MandantNr),
+            FOREIGN KEY (NachKontoId, MandantNr) REFERENCES Konto (KontoId, MandantNr)
+        );",
+        "CREATE INDEX IX_Umbuchung_Mandant_Datum ON Umbuchung (MandantNr, Datum);",
+        "CREATE INDEX IX_Umbuchung_VonKonto ON Umbuchung (VonKontoId, MandantNr);",
+        "CREATE INDEX IX_Umbuchung_NachKonto ON Umbuchung (NachKontoId, MandantNr);",
 
         @"CREATE TABLE Notiz (
-            NotizId    INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT,
-            MandantNr  INTEGER NOT NULL REFERENCES Mandant (MandantNr),
-            Betreff    TEXT    NOT NULL,
-            Text       TEXT    NOT NULL DEFAULT '',
-            Prioritaet INTEGER NOT NULL DEFAULT 2 CHECK (Prioritaet IN (1, 2, 3)),
-            Erledigt   INTEGER NOT NULL DEFAULT 0 CHECK (Erledigt IN (0, 1)),
-            BelegId    INTEGER NULL,
-            KundeId    INTEGER NULL,
-            Angelegt   TEXT    NOT NULL,
-            FOREIGN KEY (BelegId, MandantNr) REFERENCES Beleg (BelegId, MandantNr),
-            FOREIGN KEY (KundeId, MandantNr) REFERENCES Kunde (KundeId, MandantNr)
+            NotizId     INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT,
+            MandantNr   INTEGER NOT NULL REFERENCES Mandant (MandantNr),
+            Betreff     TEXT    NOT NULL,
+            Text        TEXT    NOT NULL DEFAULT '',
+            Prioritaet  INTEGER NOT NULL DEFAULT 2 CHECK (Prioritaet IN (1, 2, 3)),
+            Erledigt    INTEGER NOT NULL DEFAULT 0 CHECK (Erledigt IN (0, 1)),
+            Faelligkeit TEXT    NULL,
+            ErledigtAm  TEXT    NULL,
+            Angelegt    TEXT    NOT NULL
         );",
         "CREATE INDEX IX_Notiz_Mandant ON Notiz (MandantNr, Erledigt);",
-        "CREATE INDEX IX_Notiz_Beleg ON Notiz (BelegId, MandantNr);",
-        "CREATE INDEX IX_Notiz_Kunde ON Notiz (KundeId, MandantNr);"
+        "CREATE INDEX IX_Notiz_Faelligkeit ON Notiz (MandantNr, Faelligkeit);"
     };
 }
